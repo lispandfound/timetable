@@ -1,0 +1,3 @@
+#+TITLE: UC Timetable
+
+A simple python for displaying and managing your UC timetable.
