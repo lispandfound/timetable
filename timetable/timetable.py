@@ -32,7 +32,7 @@ class Activity:
         if Activity.days[self.day] != Activity.days[other.day]:
             return Activity.days[self.day] < Activity.days[other.day]
         else:
-            return self.start_time < self.end_time
+            return self.start_time < other.start_time
 
     def __repr__(self):
         cn = self.__class__.__name__
