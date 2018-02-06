@@ -74,7 +74,7 @@ class Course:
         '''Fetch course details and update activities.'''
 
         with requests.get(self.to_url()) as r:
-            soup = BeautifulSoup(r.content)
+            soup = BeautifulSoup(r.content, 'html.parser')
             course_table = soup.select_one('table.table.table-hover.table-bordered.table-condensed.cf')
             section_headers = [e.find_next_sibling('tbody') for e in course_table.find_all('thead', class_='cf')]
             for section_header in section_headers:
