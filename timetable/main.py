@@ -2,6 +2,8 @@ import click
 import timetable
 import time
 import configparser
+import json
+import os
 from terminaltables import SingleTable
 from collections import defaultdict
 from itertools import zip_longest
@@ -76,10 +78,22 @@ def get_allocated_activity(config, course, section_name, default=1):
 @click.pass_context
 def cli(ctx):
     config = parse_config('./test.ini')
-    courses = get_courses(config)
+    courses = {(course.title, course.year, course.semester): course for course in get_courses(config)}
     activities = defaultdict(list)
-    for course in courses:
-        course.fetch_details()
+    if os.path.exists('./test.json'):
+        with open('./test.json', 'r') as infile:
+            json_config = json.load(infile,
+                                    object_hook=timetable.timetable_load_hook)
+        for course in json_config:
+            if not isinstance(course, timetable.Course):
+                continue
+            key_tuple = (course.title, course.year, course.semester)
+            if key_tuple in courses:
+                courses[key_tuple] = course
+
+    for course in courses.values():
+        if course.activities == {}:
+            course.fetch_details()
         for section_name, section_activities in course.activities.items():
             allocated_activity = get_allocated_activity(config, course, section_name)
             if len(section_activities) > 0 and allocated_activity < len(section_activities):
@@ -88,6 +102,9 @@ def cli(ctx):
 
     ctx.obj['courses'] = courses
     ctx.obj['activities'] = activities
+
+    with open('./test.json', 'w') as out:
+        json.dump(list(courses.values()), out, cls=timetable.TimetableEncoder)
 
 
 @cli.command('timetable')
