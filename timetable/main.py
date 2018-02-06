@@ -1,3 +1,4 @@
+import click
 import timetable
 import time
 import configparser
@@ -68,11 +69,12 @@ def get_allocated_activity(config, course, section_name, default=1):
     act_id = default
     if config.has_section(section_config_name):
         act_id = config[section_config_name].getint('allocated_activity', default)
-
     return max(act_id - 1, 0)
 
 
-def main():
+@click.group()
+@click.pass_context
+def cli(ctx):
     config = parse_config('./test.ini')
     courses = get_courses(config)
     activities = defaultdict(list)
@@ -84,7 +86,14 @@ def main():
                 a = section_activities[allocated_activity]
                 activities[a.day].append((a, section_name, course))
 
-    sorted_days = sorted(activities.items(), key=lambda kv: timetable.Activity.days[kv[0]])
+    ctx.obj['courses'] = courses
+    ctx.obj['activities'] = activities
+
+
+@cli.command('timetable')
+@click.pass_context
+def show_timetable(ctx):
+    sorted_days = sorted(ctx.obj['activities'].items(), key=lambda kv: timetable.Activity.days[kv[0]])
     rendered_days = [['Times', '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '16:00 - 17:00', '17:00 - 18:00']]
     for day, day_activities in sorted_days:
         rendered_activities = render_day(day, day_activities)
@@ -94,4 +103,5 @@ def main():
     print(SingleTable(list(tabled_activities)).table)
 
 
-main()
+if __name__ == '__main__':
+    cli(obj={})
