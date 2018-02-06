@@ -1,6 +1,7 @@
 import functools
 import requests
 import time
+import json
 from bs4 import BeautifulSoup
 from bs4 import NavigableString
 
@@ -22,6 +23,15 @@ class Activity:
         self.end_time = end_time
         self.location = location
 
+
+    @property
+    def start(self):
+        return time.strftime('%H:%M', self.start_time)
+
+    @property
+    def end(self):
+        return time.strftime('%H:%M', self.end_time)
+
     def __eq__(self, other):
         '''Returns True if two Activities are the same.'''
         return ((self.activity_id, self.day, self.start_time, self.end_time, self.location)
@@ -36,9 +46,17 @@ class Activity:
 
     def __repr__(self):
         cn = self.__class__.__name__
-        start = time.strftime('%H:%M', self.start_time)
-        end = time.strftime('%H:%M', self.end_time)
-        return f'{cn}({self.activity_id}, {self.day}, {start}, {end}, {self.location})'
+        return f'{cn}({self.activity_id}, {self.day}, {self.start}, {self.end}, {self.location})'
+
+    def as_json(self):
+        return {
+            '__activity__': True,
+            'id': self.activity_id,
+            'day': self.day,
+            'start': self.start,
+            'end': self.end,
+            'location': self.location
+        }
 
 
 def parse_activity(activity_element):
@@ -72,7 +90,6 @@ class Course:
 
     def fetch_details(self):
         '''Fetch course details and update activities.'''
-
         with requests.get(self.to_url()) as r:
             soup = BeautifulSoup(r.content, 'html.parser')
             course_table = soup.select_one('table.table.table-hover.table-bordered.table-condensed.cf')
@@ -88,3 +105,30 @@ class Course:
                     activity_rows.append(row)
                 activities = [parse_activity(row) for row in activity_rows]
                 self.activities[section_name] = activities
+
+    def as_json(self):
+        return {
+            '__course__': True,
+            'title': self.title,
+            'year': self.year,
+            'semester': self.semester,
+            'activities': self.activities
+        }
+
+def timetable_load_hook(dct):
+    if '__course__' in dct:
+        return Course(dct['title'], dct['year'], dct['semester'], activities=dct['activities'])
+    elif '__activity__' in dct:
+        start = time.strptime(dct['start'], '%H:%M')
+        end = time.strptime(dct['end'], '%H:%M')
+        return Activity(dct['id'], dct['day'], start, end, dct['location'])
+    else:
+        return dct
+
+
+class TimetableEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Course) or isinstance(obj, Activity):
+            return obj.as_json()
+        else:
+            return obj
