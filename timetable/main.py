@@ -76,13 +76,18 @@ def get_allocated_activity(config, course, section_name, default=1):
 
 
 @click.group()
+@click.option('--config-path', envvar='TIMETABLE_CONFIG_PATH', type=click.Path())
 @click.pass_context
-def cli(ctx):
-    config = parse_config('./test.ini')
+def cli(ctx, config_path):
+    if not os.path.exists(config_path):
+        os.makedirs(config_path)
+
+    config = parse_config(os.path.join(config_path, 'config'))
     courses = {(course.title, course.year, course.semester): course for course in get_courses(config)}
     activities = defaultdict(list)
-    if os.path.exists('./test.json'):
-        with open('./test.json', 'r') as infile:
+    json_path = os.path.join(config_path, 'data.json')
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as infile:
             json_config = json.load(infile,
                                     object_hook=timetable.timetable_load_hook)
         for course in json_config:
@@ -104,7 +109,7 @@ def cli(ctx):
     ctx.obj['courses'] = courses
     ctx.obj['activities'] = activities
 
-    with open('./test.json', 'w') as out:
+    with open(json_path, 'w') as out:
         json.dump(list(courses.values()), out, cls=timetable.TimetableEncoder)
 
 
