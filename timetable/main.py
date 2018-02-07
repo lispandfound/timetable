@@ -1,6 +1,7 @@
 import click
 import timetable
 import time
+from datetime import datetime, timedelta
 import configparser
 import json
 import os
@@ -118,6 +119,42 @@ def show_timetable(ctx):
 
     tabled_activities = zip_longest(*[list(day) for day in rendered_days], fillvalue='')
     print(SingleTable(list(tabled_activities)).table)
+
+
+@cli.command('next')
+@click.option('--show-time', is_flag=True, default=False)
+@click.pass_context
+def show_next(ctx, show_time):
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    today = datetime.now()
+    week_day = days[today.weekday()]
+
+    next_classes = []
+    if today.weekday() < 4:
+        days_activities = sorted(ctx.obj['activities'][week_day])
+        i = 0
+        while i < len(days_activities):
+            next_activity = days_activities[i]
+            start = next_activity[0].start_time
+            start_datetime = today.replace(hour=start.tm_hour, minute=start.tm_min)
+            if len(next_classes) > 0 and start == next_classes[-1][0].start_time:
+                next_classes.append(next_activity)
+            elif len(next_classes) > 0 and start != next_classes[-1][0].start_time:
+                break
+            elif today < start_datetime:
+                next_classes = [next_activity]
+            i += 1
+
+    if len(next_classes) == 0:
+        print('You have no more classes for today.')
+    elif show_time:
+        start = next_classes[0][0].start_time
+        start_datetime = today.replace(hour=start.tm_hour, minute=start.tm_min)
+        print(start_datetime - today)
+    else:
+        for activity, title, course in next_classes:
+            print(f'{course.title} - {title} @ {activity.start}: {activity.location}')
+
 
 
 if __name__ == '__main__':
