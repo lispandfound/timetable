@@ -87,7 +87,6 @@ class Course:
         time_code = f'{year_identifier}S{self.semester}(C)'
         return f'{UC_URL}?course={self.title}&occurrence={time_code}&year={self.year}'
 
-
     def fetch_details(self):
         '''Fetch course details and update activities.'''
         with requests.get(self.to_url()) as r:
@@ -114,6 +113,7 @@ class Course:
             'semester': self.semester,
             'activities': self.activities
         }
+
 
 def timetable_load_hook(dct):
     if '__course__' in dct:
