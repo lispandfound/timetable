@@ -25,7 +25,7 @@ def render_day(day, activities):
             if da[0].start_time < prev_activity[0].end_time:
                 start = time.strftime('%H:%M', da[0].start_time)
                 if da[2] != prev_activity[2]:
-                    rendered_activities[-1] = f'CLASH: {activity_as_str(*prev_activity)} & {activity_as_str(*da)}'
+                    rendered_activities[-1] = f'{activity_as_str(*prev_activity)}\n{activity_as_str(*da)}'
                 i += 1
                 continue
             time_delta = int(time.mktime(da[0].start_time) - time.mktime(prev_activity[0].end_time))
@@ -146,7 +146,7 @@ def show_next(ctx, show_time):
             i += 1
 
     if len(next_classes) == 0:
-        print('You have no more classes for today.')
+        return
     elif show_time:
         start = next_classes[0][0].start_time
         start_datetime = today.replace(hour=start.tm_hour, minute=start.tm_min)
