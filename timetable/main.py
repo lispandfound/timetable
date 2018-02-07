@@ -76,9 +76,10 @@ def get_allocated_activity(config, course, section_name, default=1):
 
 
 @click.group()
-@click.option('--config-path', envvar='TIMETABLE_CONFIG_PATH', type=click.Path())
+@click.option('--config-path', envvar='TIMETABLE_CONFIG_PATH', type=click.Path(), help='Path to configuration (config, data.json).', required=True)
 @click.pass_context
 def cli(ctx, config_path):
+    ''' View and manage your UC timetable. '''
     if not os.path.exists(config_path):
         os.makedirs(config_path)
 
@@ -116,6 +117,7 @@ def cli(ctx, config_path):
 @cli.command('timetable')
 @click.pass_context
 def show_timetable(ctx):
+    ''' Show your weekly timetable. '''
     sorted_days = sorted(ctx.obj['activities'].items(), key=lambda kv: timetable.Activity.days[kv[0]])
     rendered_days = [['Times', '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '16:00 - 17:00', '17:00 - 18:00']]
     for day, day_activities in sorted_days:
@@ -127,9 +129,10 @@ def show_timetable(ctx):
 
 
 @cli.command('next')
-@click.option('--show-time', is_flag=True, default=False)
+@click.option('--show-time', is_flag=True, default=False, help='Show the time to your next class.')
 @click.pass_context
 def show_next(ctx, show_time):
+    ''' Show your next class. '''
     days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
     today = datetime.now()
     week_day = days[today.weekday()]
@@ -162,5 +165,5 @@ def show_next(ctx, show_time):
 
 
 
-if __name__ == '__main__':
+def main():
     cli(obj={})
