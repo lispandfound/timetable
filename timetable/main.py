@@ -1,5 +1,5 @@
 import click
-import timetable
+from timetable import timetable
 import time
 from datetime import datetime, timedelta
 import configparser
