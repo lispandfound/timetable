@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 
 import requests
+
 from bs4 import BeautifulSoup, NavigableString
 
 UC_URL = 'http://www.canterbury.ac.nz/courseinfo/GetCourseDetails.aspx'
@@ -42,7 +43,7 @@ class Location:
             date_match = re.search(DATE_RE, date)
             if date_match is None:
                 raise ValueError(
-                    f'repr(location_string) is not a valid location.')
+                    f'{repr(location_string)} is not a valid location.')
             elif date_match.group(2) is None or date_match.group(3) is None:
                 self.valid_dates.append(
                     parse_short_date(date_match.group(1), self.year))
