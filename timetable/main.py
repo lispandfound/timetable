@@ -7,8 +7,8 @@ from datetime import datetime
 from itertools import zip_longest
 
 import click
-from terminaltables import SingleTable
 
+from terminaltables import SingleTable
 from timetable import timetable
 
 
@@ -137,7 +137,7 @@ def show_timetable(ctx):
     rendered_days = [[
         'Times', '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00',
         '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00',
-        '16:00 - 17:00', '17:00 - 18:00'
+        '15:00 - 16:00', '16:00 - 17:00'
     ]]
     for day, day_activities in sorted_days:
         rendered_activities = render_day(day, day_activities)
