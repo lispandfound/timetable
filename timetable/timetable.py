@@ -114,11 +114,11 @@ class Activity:
 
     @property
     def start(self):
-        return time.strftime('%H:%M', self.start_time)
+        return self.start_time.strftime('%H:%M')
 
     @property
     def end(self):
-        return time.strftime('%H:%M', self.end_time)
+        return self.end_time.strftime('%H:%M')
 
     def __eq__(self, other):
         '''Returns True if two Activities are the same.'''
@@ -151,21 +151,13 @@ class Activity:
 
 def parse_activity(activity_element, year):
     activity_id = activity_element.find_next(
-        'td', attrs={
-            'data-title': 'Activity'
-        })
+        'td', attrs={'data-title': 'Activity'})
     activity_day = activity_element.find_next(
-        'td', attrs={
-            'data-title': 'Day'
-        })
+        'td', attrs={'data-title': 'Day'})
     activity_time = activity_element.find_next(
-        'td', attrs={
-            'data-title': 'Time'
-        })
+        'td', attrs={'data-title': 'Time'})
     activity_location = activity_element.find_next(
-        'td', attrs={
-            'data-title': 'Location'
-        })
+        'td', attrs={'data-title': 'Location'})
 
     for br in activity_location.find_all("br"):
         br.replace_with("\n")
@@ -178,10 +170,10 @@ def parse_activity(activity_element, year):
             locations.append(Location(location, year))
 
     [start_time, end_time] = [
-        time.strptime(t.strip(), '%H:%M')
+        datetime.strptime(t.strip(), '%H:%M')
         for t in activity_time.text.strip().split('-')
     ]
-    activity_id = int(activity_id.text.strip())
+    activity_id = activity_id.text.strip()
     return Activity(activity_id, activity_day.text.strip(), start_time,
                     end_time, locations)
 
@@ -223,10 +215,11 @@ class Course:
                         continue
                     if row.name and row.name != 'tr':
                         break
-                    activity_rows.append(row)
-                activities = [
-                    parse_activity(row, self.year) for row in activity_rows
-                ]
+                    activity_rows.append(parse_activity(row, self.year))
+                activities = {
+                    activity.activity_id: activity
+                    for activity in activity_rows
+                }
                 self.activities[section_name] = activities
 
     def as_json(self):
@@ -247,8 +240,8 @@ def timetable_load_hook(dct):
             dct['semester'],
             activities=dct['activities'])
     elif '__activity__' in dct:
-        start = time.strptime(dct['start'], '%H:%M')
-        end = time.strptime(dct['end'], '%H:%M')
+        start = datetime.strptime(dct['start'], '%H:%M')
+        end = datetime.strptime(dct['end'], '%H:%M')
         return Activity(dct['id'], dct['day'], start, end, dct['location'])
     elif '__location__' in dct:
         dates = dct['valid_dates']

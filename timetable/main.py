@@ -3,13 +3,19 @@ import json
 import os
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import zip_longest
 
 import click
 
 from terminaltables import SingleTable
 from timetable import timetable
+
+TIMES = [
+    '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00',
+    '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '15:00 - 16:00',
+    '16:00 - 17:00'
+]
 
 
 def activity_as_str(activity, section, course):
@@ -19,35 +25,27 @@ def activity_as_str(activity, section, course):
 def render_day(day, activities):
     day_activities = sorted(activities)
     rendered_activities = [day]
-    i = 0
-    while i < len(day_activities):
-        da = day_activities[i]
-        if i > 0:
-            prev_activity = day_activities[i - 1]
-            if da[0].start_time < prev_activity[0].end_time:
-                start = time.strftime('%H:%M', da[0].start_time)
-                if da[2] != prev_activity[2]:
-                    rendered_activities[
-                        -1] = f'{activity_as_str(*prev_activity)}\n{activity_as_str(*da)}'
-                i += 1
-                continue
-            time_delta = int(
-                time.mktime(da[0].start_time) -
-                time.mktime(prev_activity[0].end_time))
-            rendered_activities.extend([' '] * (time_delta // 3600))
-        else:
-            start = time.mktime(time.strptime('08:00', '%H:%M'))
-            time_delta = int(time.mktime(da[0].start_time) - start)
-            rendered_activities.extend([' '] * (time_delta // 3600))
+    binned_activities = [[] for _ in range(len(TIMES))]
+    day_start = datetime.strptime('08:00', '%H:%M')
+    for activity in day_activities:
+        activity_start, _, _ = activity
+        tdelta = activity_start.start_time - day_start
+        activity_length = activity_start.end_time - activity_start.start_time
+        hour_index = tdelta.seconds // 3600
+        length_in_hours = activity_length.seconds // 3600
+        for i in range(length_in_hours):
+            binned_activities[hour_index + i].append(activity)
 
-        rendered_activities.append(activity_as_str(*da))
-        i += 1
+    rendered_activities.extend([
+        '\n'.join(activity_as_str(*activity) for activity in act_bin)
+        for act_bin in binned_activities
+    ])
 
     return rendered_activities
 
 
 def parse_iso_date(datestring):
-    return time.strptime(datestring, '%Y-%m-%d')
+    return datetime.strptime(datestring, '%Y-%m-%d')
 
 
 def parse_config(filename):
@@ -75,9 +73,8 @@ def get_allocated_activity(config, course, section_name, default=1):
     section_config_name = f'{course.title}/{section_name}'
     act_id = default
     if config.has_section(section_config_name):
-        act_id = config[section_config_name].getint('allocated_activity',
-                                                    default)
-    return max(act_id - 1, 0)
+        act_id = config[section_config_name].get('allocated_activity', default)
+    return act_id
 
 
 @click.group()
@@ -115,10 +112,10 @@ def cli(ctx, config_path):
         for section_name, section_activities in course.activities.items():
             allocated_activity = get_allocated_activity(
                 config, course, section_name)
-            if len(section_activities) > 0 and allocated_activity < len(
-                    section_activities):
-                a = section_activities[allocated_activity]
-                activities[a.day].append((a, section_name, course))
+            a = section_activities.get(
+                allocated_activity,
+                section_activities[list(section_activities)[0]])
+            activities[a.day].append((a, section_name, course))
 
     ctx.obj['courses'] = courses
     ctx.obj['activities'] = activities
@@ -134,11 +131,7 @@ def show_timetable(ctx):
     sorted_days = sorted(
         ctx.obj['activities'].items(),
         key=lambda kv: timetable.Activity.days[kv[0]])
-    rendered_days = [[
-        'Times', '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00',
-        '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00',
-        '15:00 - 16:00', '16:00 - 17:00'
-    ]]
+    rendered_days = [['Times'] + TIMES]
     for day, day_activities in sorted_days:
         rendered_activities = render_day(day, day_activities)
         rendered_days.append(rendered_activities)
