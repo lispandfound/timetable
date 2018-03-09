@@ -168,18 +168,15 @@ def show_next(ctx, show_time, at):
 
     next_classes = []
     days_activities = sorted(ctx.obj['activities'][week_day])
-    i = 0
-    while i < len(days_activities):
-        next_activity = days_activities[i]
-        start = next_activity[0].start_time
+    for activity in days_activities:
+        start = activity[0].start_time
         start_datetime = today.replace(hour=start.tm_hour, minute=start.tm_min)
         if len(next_classes) > 0 and start == next_classes[-1][0].start_time:
-            next_classes.append(next_activity)
+            next_classes.append(activity)
         elif len(next_classes) > 0 and start != next_classes[-1][0].start_time:
             break
         elif today < start_datetime:
-            next_classes = [next_activity]
-        i += 1
+            next_classes = [activity]
 
     if len(next_classes) == 0:
         return
