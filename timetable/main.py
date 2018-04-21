@@ -1,199 +1,179 @@
-import configparser
-import json
+""" Print, display, and manage your UC timetable.
+
+Usage:
+    timetable [-v] show [--on=<date>] [--drop-cache]
+    timetable [-v] next [--time] [--drop-cache]
+
+Options:
+    -h, --help         Show this screen.
+    --on=<date>        Show the timetable for this date.
+    --drop-cache       Drop the current data file.
+    --time             Show the time to the next class.
+    -v, --verbose      Be more verbose.
+"""
+import calendar
 import os
-import time
-from collections import defaultdict
-from datetime import datetime, timedelta
-from itertools import zip_longest
+import pathlib
+import pickle
+from datetime import datetime
 
-import click
+from docopt import docopt
+from schema import Or, Schema, SchemaError, Use
 
-from terminaltables import SingleTable
-from timetable import timetable
+from . import config, timetable
 
-TIMES = [
-    '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00',
-    '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '15:00 - 16:00',
-    '16:00 - 17:00'
-]
+COMMAND_MAP = {}
 
-
-def activity_as_str(activity, section, course):
-    return f'{course.title} {section}'
-
-
-def render_day(day, activities):
-    day_activities = sorted(activities)
-    rendered_activities = [day]
-    binned_activities = [[] for _ in range(len(TIMES))]
-    day_start = datetime.strptime('08:00', '%H:%M')
-    for activity in day_activities:
-        activity_start, _, _ = activity
-        tdelta = activity_start.start_time - day_start
-        activity_length = activity_start.end_time - activity_start.start_time
-        hour_index = tdelta.seconds // 3600
-        length_in_hours = activity_length.seconds // 3600
-        for i in range(length_in_hours):
-            binned_activities[hour_index + i].append(activity)
-
-    rendered_activities.extend([
-        '\n'.join(activity_as_str(*activity) for activity in act_bin)
-        for act_bin in binned_activities
-    ])
-
-    return rendered_activities
+COMMAND_SCHEMA = Schema({
+    '--on':
+    Or(Use(lambda v: datetime.strptime(v, '%Y-%m-%d')), None),
+    '--drop-cache':
+    bool,
+    '--time':
+    bool,
+    'next':
+    bool,
+    'show':
+    bool,
+    '--verbose':
+    bool
+})
 
 
-def parse_iso_date(datestring):
-    return datetime.strptime(datestring, '%Y-%m-%d')
+def command(name):
+    ''' Declare a command to be used by the argument parser.
+
+    Args:
+        name (str): The name of the command.
+
+    Returns:
+        function: A function takes one argument callback and appends
+                  name: callback to COMMAND_MAP. '''
+
+    def decorator(callback):
+        COMMAND_MAP[name] = callback
+        return callback
+
+    return decorator
 
 
-def parse_config(filename):
-    converters = {'date': parse_iso_date}
-    parser = configparser.ConfigParser(converters=converters)
-    with open(filename, 'r') as infile:
-        parser.read_file(infile)
-        return parser
+def get_config():
+    ''' Get all configuration files/data from the config directory.
+
+    "the config directory" in this context means the path specified by
+    the TIMETABLE_CONFIG_PATH environment variable.
+
+    Returns:
+        (pathlib.Path, list of courses, dict): The
+        path to the configuration directory, the list of courses found in
+        the data file there, and the parsed config file. '''
+    config_path = pathlib.Path(os.getenv('TIMETABLE_CONFIG_PATH'))
+    data_path = config_path / 'data'
+    config_file = config_path / 'config'
+    data = None
+    if data_path.exists():
+        with open(data_path, 'rb') as infile:
+            data = pickle.load(infile)
+    return config_path, data, config.parse_config(config_file)
 
 
-def get_courses(config):
-    courses = []
-    for section in config.sections():
-        if section.startswith('course/'):
-            course_name = section[7:]
-            course_year = config[section].getint('year')
-            course_semester = config[section].getint('semester')
-            course = timetable.Course(course_name, course_year,
-                                      course_semester)
-            courses.append(course)
-    return courses
+def print_activity(config_dict, date, course, activity):
+    ''' Print an activity.
+
+    Prints an activity in the context of the course it belongs to, the
+    current date, and the colours specified by the user.
+
+    Args:
+        config_dict (dict): Used to obtain the colour to print the course
+                       in.
+        date (datetime.datetime): The date to filter locations by.
+        course (timetable.Course): The parent course of the activity.
+        activity (timetable.Activity): The activity to print. '''
+    relevant_location = activity.location_valid_for(date)
+    start = activity.start.strftime('%H:%M')
+    colour = config.colour_of_course(config_dict, course)
+    title = f'{colour.value}{course.title}{config.TermColour.RESET.value}'
+    end = activity.end.strftime('%H:%M')
+    print(
+        f'{title} {activity.name} @ {relevant_location.place} :: {start} - {end}'
+    )
 
 
-def get_allocated_activity(config, course, section_name, default=1):
-    section_config_name = f'{course.title}/{section_name}'
-    act_id = default
-    if config.has_section(section_config_name):
-        act_id = config[section_config_name].get('allocated_activity', default)
-    return act_id
+@command('show')
+def show_timetable(config_dict, courses, selected_activities, args):
+    ''' Show a timetable for a particular date.
+
+    This is the output of the 'show' subcommand.
+
+    Args:
+        config_dict (dict): The parsed configuration file.
+        courses (list of timetable.Course): A list of the parsed courses.
+        selected_activities (dict): A dictionary that determines what
+                                    activities are selected by the user.
+        args (dict): Additional command line arguments. '''
+    date = args['--on'] or datetime.now()
+    activities = timetable.activities_on(courses, date, selected_activities)
+    day = calendar.day_name[date.weekday()]
+    isodate = date.date().isoformat()
+    print(f'Showing timetable for {day}, {isodate}')
+    for course, activity in activities:
+        print_activity(config_dict, date, course, activity)
 
 
-@click.group()
-@click.option(
-    '--config-path',
-    envvar='TIMETABLE_CONFIG_PATH',
-    type=click.Path(),
-    help='Path to configuration (config, data.json).',
-    required=True)
-@click.pass_context
-def cli(ctx, config_path):
-    ''' View and manage your UC timetable. '''
-    if not os.path.exists(config_path):
-        os.makedirs(config_path)
+@command('next')
+def show_next(config_dict, courses, selected_activities, args):
+    ''' Show a timetable for a particular date.
 
-    config = parse_config(os.path.join(config_path, 'config'))
-    courses = {(course.title, course.year, course.semester): course
-               for course in get_courses(config)}
-    activities = defaultdict(list)
-    json_path = os.path.join(config_path, 'data.json')
-    if os.path.exists(json_path):
-        with open(json_path, 'r') as infile:
-            json_config = json.load(
-                infile, object_hook=timetable.timetable_load_hook)
-        for course in json_config:
-            if not isinstance(course, timetable.Course):
-                continue
-            key_tuple = (course.title, course.year, course.semester)
-            if key_tuple in courses:
-                courses[key_tuple] = course
+    This is the output of the 'show' subcommand.
 
-    for course in courses.values():
-        if course.activities == {}:
-            course.fetch_details()
-        for section_name, section_activities in course.activities.items():
-            allocated_activity = get_allocated_activity(
-                config, course, section_name)
-            a = section_activities.get(
-                allocated_activity,
-                section_activities[list(section_activities)[0]])
-            activities[a.day].append((a, section_name, course))
-
-    ctx.obj['courses'] = courses
-    ctx.obj['activities'] = activities
-
-    with open(json_path, 'w') as out:
-        json.dump(list(courses.values()), out, cls=timetable.TimetableEncoder)
-
-
-@cli.command('show')
-@click.pass_context
-def show_timetable(ctx):
-    ''' Show your weekly timetable. '''
-    sorted_days = sorted(
-        ctx.obj['activities'].items(),
-        key=lambda kv: timetable.Activity.days[kv[0]])
-    rendered_days = [['Times'] + TIMES]
-    for day, day_activities in sorted_days:
-        rendered_activities = render_day(day, day_activities)
-        rendered_days.append(rendered_activities)
-
-    tabled_activities = zip_longest(
-        *[list(day) for day in rendered_days], fillvalue='')
-    print(SingleTable(list(tabled_activities)).table)
-
-
-@cli.command('next')
-@click.option(
-    '--show-time',
-    is_flag=True,
-    default=False,
-    help='Show the time to your next class.')
-@click.option(
-    '--at',
-    help=
-    'Set the date and time (in YYYY-MM-DD HH:MM format) to find next class for.',
-    default=None)
-@click.pass_context
-def show_next(ctx, show_time, at):
-    ''' Show your next class. '''
-    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    if at is None:
-        today = datetime.now()
-    else:
-        today = datetime.strptime(at, '%Y-%m-%d %H:%M')
-
-    if today.weekday() > 4:
-        return
-
-    week_day = days[today.weekday()]
-
-    next_classes = []
-    days_activities = sorted(ctx.obj['activities'][week_day])
-    for activity in days_activities:
-        start = activity[0].start_time
-        start_datetime = today.replace(hour=start.tm_hour, minute=start.tm_min)
-        if len(next_classes) > 0 and start == next_classes[-1][0].start_time:
-            next_classes.append(activity)
-        elif len(next_classes) > 0 and start != next_classes[-1][0].start_time:
-            break
-        elif today < start_datetime:
-            next_classes = [activity]
-
-    if len(next_classes) == 0:
-        return
-    elif show_time:
-        start = next_classes[0][0].start_time
-        start_datetime = today.replace(hour=start.tm_hour, minute=start.tm_min)
-        print(start_datetime - today)
-    else:
-        for activity, title, course in next_classes:
-            valid_location = next((loc for loc in activity.location
-                                   if loc.valid_for(today)), None)
-            if valid_location is None:
-                continue
-            print(
-                f'{course.title} - {title} @ {activity.start}: {valid_location.name}'
-            )
+    Args:
+        config_dict (dict): The parsed configuration file.
+        courses (list of timetable.Course): A list of the parsed courses.
+        selected_activities (dict): A dictionary that determines what
+                                    activities are selected by the user.
+        args (dict): Additional command line arguments. '''
+    now = datetime.now()
+    activities = timetable.activities_on(courses, now, selected_activities)
+    next_activity = next(((course, activity) for course, activity in activities
+                          if activity.start > now.time()), None)
+    if next_activity is not None and args['--time']:
+        course, act = next_activity
+        time_dt = now.replace(hour=act.start.hour, minute=act.start.minute)
+        delta = time_dt - now
+        print(delta)
+    elif next_activity is not None:
+        course, act = next_activity
+        print_activity(config_dict, now, course, act)
 
 
 def main():
-    cli(obj={})
+    ''' Main function. '''
+    arguments = docopt(__doc__, version='Timetable 0.1.0.')
+    try:
+        arguments = COMMAND_SCHEMA.validate(arguments)
+    except SchemaError:
+        exit(__doc__)
+    try:
+        config_path, data, config_dict = get_config()
+    except SchemaError as e:
+        if arguments['--verbose']:
+            exit(e.code)
+        else:
+            exit('Failed to parse config.')
+    courses = config.get_courses(config_dict)
+    if data is None or arguments['--drop-cache']:
+        for course in courses:
+            course.fetch_activities()
+    else:
+        courses = data
+    selected_activities = config.get_selected_activities(config_dict, courses)
+    # Find first callback that docopt believes has been called.
+    callback = next(callback for cmd, callback in COMMAND_MAP.items()
+                    if arguments[cmd] is True)
+    callback(config_dict, courses, selected_activities, arguments)
+    with open(config_path / 'data', 'wb') as out:
+        pickle.dump(courses, out)
+
+
+if __name__ == '__main__':
+    main()

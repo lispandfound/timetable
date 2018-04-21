@@ -7,12 +7,12 @@ name = "pypi"
 
 [packages]
 
-requests = "*"
-"beautifulsoup4" = "*"
-terminaltables = "*"
-click = "*"
 setuptools = "*"
+attrs = "*"
+"flake8" = "*"
+docopt = "*"
+requests-html = "*"
+schema = "*"
 
 
 [dev-packages]
-
