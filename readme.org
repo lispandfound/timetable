@@ -58,8 +58,8 @@ Run:
 * :hammer: Usage
 There are two components to working with the timetable. To start with
 we have the config file, which lives in
-=TIMETABLE_CONFIG_PATH/config=. This is a variable you should set
-yourself, I'd personally recommend the =~/.config/timetable=.
+=TIMETABLE_CONFIG_PATH/config=. This is an environment variable you
+should set yourself, I'd personally recommend =~/.config/timetable=.
 
 #+BEGIN_SRC conf
   # Contents of ~/.config/timetable/config
