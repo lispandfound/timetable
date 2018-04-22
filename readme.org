@@ -128,6 +128,10 @@ Now that you have fully configured the program, the usage is simple:
   # ... I meant tomorrow
   $ timetable show --on=2018-03-04 # Or whenever tomorrow is.
 
+  # I'm a more visual person, do you have any other ways of showing this?
+  timetable show --timeline
+  # See below for what this looks like.
+
   # What's coming up next???
   $ timetable next
 
@@ -143,5 +147,12 @@ Now that you have fully configured the program, the usage is simple:
   # I'm stuck.
   $ timetable --help
 #+END_SRC
+** Timeline
+
+The timeline mode shows your classes in a vertical timeline, just like
+you might expect on a startup's about me landing page. I think it
+highlights clashes a little easier than the standard view.
+
+[[file:timeline.png]]
 * Meta
 Distributed under MIT License, see =LICENSE= file for info.
