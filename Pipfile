@@ -13,6 +13,8 @@ attrs = "*"
 docopt = "*"
 requests-html = "*"
 schema = "*"
+drawille = "*"
 
 
 [dev-packages]
+

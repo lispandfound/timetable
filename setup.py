@@ -11,4 +11,6 @@ setup(
     packages=['timetable'],
     entry_points={'console_scripts': ['timetable=timetable.main:main']},
     zip_safe=False,
-    install_requires=['docopt', 'attrs', 'requests-html', 'schema'])
+    install_requires=[
+        'docopt', 'attrs', 'requests-html', 'drawille', 'schema'
+    ])
