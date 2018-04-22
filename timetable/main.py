@@ -1,7 +1,7 @@
 """ Print, display, and manage your UC timetable.
 
 Usage:
-    timetable [-v] show [--on=<date>] [--drop-cache]
+    timetable [-v] show [--on=<date>] [--drop-cache] [--timeline]
     timetable [-v] next [--time] [--drop-cache]
 
 Options:
@@ -9,18 +9,23 @@ Options:
     --on=<date>        Show the timetable for this date.
     --drop-cache       Drop the current data file.
     --time             Show the time to the next class.
+    -t, --timeline     Show your timetable in a fancy timeline.
     -v, --verbose      Be more verbose.
 """
 import calendar
+import itertools
 import os
 import pathlib
 import pickle
+from collections import OrderedDict
 from datetime import datetime
+
+from drawille import Canvas
 
 from docopt import docopt
 from schema import Or, Schema, SchemaError, Use
 
-from . import config, timetable
+from . import config, draw, timetable
 
 COMMAND_MAP = {}
 
@@ -36,6 +41,8 @@ COMMAND_SCHEMA = Schema({
     'show':
     bool,
     '--verbose':
+    bool,
+    '--timeline':
     bool
 })
 
@@ -99,6 +106,52 @@ def print_activity(config_dict, date, course, activity):
     )
 
 
+def print_timeline(config_dict, date, activities):
+    ''' Print out your activities in a fancy timeline.
+
+    See timeline.png for an example of what this looks like.
+
+    Args:
+        config_dict (dict): The parsed configuration file
+        date (datetime.datetime): The current date (used to find locations).
+        activities (list of (Course, Activity)): The activities for the current date. '''
+    if len(activities) == 0:
+        return
+    # Find the longest line (in terms of length on the canvas) of the
+    # activities and courses. This is to make the boxes as big as the
+    # longest line.
+    activities = [(course, activity, activity.location_valid_for(date))
+                  for course, activity in activities]
+    titles = (course.title for course, _, _ in activities)
+    names = (act.name for _, act, _ in activities)
+    locations = (location.place for _, _, location in activities)
+    box_width = max(
+        len(line) for line in itertools.chain(titles, names, locations)) * 4
+    # The box height is determined by the number of lines
+    # Our box will look like this:
+    # title
+    #
+    # name
+    # location
+    # end time
+    # So that's 5 lines times 5 (the height of the pixel in character
+    # terms plus a little padding), 25 pixels height.
+    box_height = 25
+    # Now we convert our (course, activity) pairs to text and bin our
+    # activities based on their start time.
+    mapping = OrderedDict()
+    for course, activity, location in activities:
+        key = activity.start.strftime('%H:%M')
+        map_bin = mapping.get(key, [])
+        activity_text = f'{course.title}\n\n{activity.name}\n{location.place}\n{activity.end:%H:%M}'
+        map_bin.append(activity_text)
+        mapping[key] = map_bin
+
+    canvas = Canvas()
+    draw.timeline(canvas, 0, 0, box_width, box_height, mapping)
+    print(canvas.frame())
+
+
 @command('show')
 def show_timetable(config_dict, courses, selected_activities, args):
     ''' Show a timetable for a particular date.
@@ -116,8 +169,11 @@ def show_timetable(config_dict, courses, selected_activities, args):
     day = calendar.day_name[date.weekday()]
     isodate = date.date().isoformat()
     print(f'Showing timetable for {day}, {isodate}')
-    for course, activity in activities:
-        print_activity(config_dict, date, course, activity)
+    if args['--timeline'] is True:
+        print_timeline(config_dict, date, activities)
+    else:
+        for course, activity in activities:
+            print_activity(config_dict, date, course, activity)
 
 
 @command('next')
