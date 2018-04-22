@@ -1,7 +1,7 @@
 import configparser
 from enum import Enum
 
-from schema import And, Optional, Or, Schema, SchemaError, Use
+from schema import And, Optional, Or, Schema, Use
 
 from . import timetable
 

@@ -1,8 +1,6 @@
 import calendar
-import functools
 import itertools
 import re
-from collections import defaultdict
 from datetime import datetime
 
 import attr
