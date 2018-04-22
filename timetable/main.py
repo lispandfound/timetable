@@ -102,7 +102,7 @@ def print_activity(config_dict, date, course, activity):
     title = f'{colour.value}{course.title}{config.TermColour.RESET.value}'
     end = activity.end.strftime('%H:%M')
     print(
-        f'{title} {activity.name} @ {relevant_location.place} :: {start} - {end}'
+        f'{start} - {end} :: {title} {activity.name} @ {relevant_location.place}'
     )
 
 
