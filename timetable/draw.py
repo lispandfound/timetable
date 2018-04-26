@@ -46,7 +46,7 @@ def box(canvas, x, y, width, height, contents):
     line(canvas, x, y, x, y + height)
     # Right of box
     line(canvas, x + width, y, x + width, y + height)
-    for y_l, text_line in zip(range(y + 4, y + width, 4), lines):
+    for y_l, text_line in zip(range(y + 4, y + height, 4), lines):
         canvas.set_text(x + 4, y_l, text_line)
 
 
