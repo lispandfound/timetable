@@ -14,6 +14,10 @@ def text_len(text):
     return len(text) * 2
 
 
+def text_height(text):
+    return len(text.split('\n')) * 4
+
+
 def line(canvas, x1, y1, x2, y2):
     ''' Draw a line from (x1, y1) to (x2, y2).
 
@@ -85,3 +89,23 @@ def timeline(canvas, x, y, box_width, box_height, mapping):
         for value in values:
             box(canvas, x_start, y_l, box_width, box_height, value)
             x_start += box_width + 4
+
+
+def columns(rows):
+    return zip(*rows)
+
+
+def table(canvas, x, y, rows):
+    table_columns = columns(rows)
+    column_widths = [
+        max(text_len(el) for el in column) for column in table_columns
+    ]
+    row_heights = [max(text_height(el) for el in row) + 8 for row in rows]
+    y_pos = y
+    for height, row in zip(row_heights, rows):
+        x_pos = x
+        for j, el in enumerate(row):
+            box_width = column_widths[j] + 8  # Allow for padding
+            box(canvas, x_pos, y_pos, box_width, height, el)
+            x_pos += box_width
+        y_pos += height
