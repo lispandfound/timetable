@@ -2,6 +2,7 @@
 
 Usage:
     timetable [-v] show [--on=<date>] [--drop-cache] [--timeline]
+    timetable [-v] week [--on=<date>] [--drop-cache]
     timetable [-v] next [--time] [--drop-cache]
 
 Options:
@@ -17,8 +18,8 @@ import itertools
 import os
 import pathlib
 import pickle
-from collections import OrderedDict
-from datetime import datetime
+from collections import OrderedDict, defaultdict
+from datetime import datetime, timedelta
 
 from drawille import Canvas
 
@@ -39,6 +40,8 @@ COMMAND_SCHEMA = Schema({
     'next':
     bool,
     'show':
+    bool,
+    'week':
     bool,
     '--verbose':
     bool,
@@ -150,6 +153,58 @@ def print_timeline(config_dict, date, activities):
     canvas = Canvas()
     draw.timeline(canvas, 0, 0, box_width, box_height, mapping)
     print(canvas.frame())
+
+
+def find_day_of_week(date, weekday):
+    return date + timedelta(days=weekday - date.weekday())
+
+
+def print_week_timetable(config_dict, date, courses, selected_activities):
+    dates = [
+        find_day_of_week(date, day)
+        for day in range(calendar.MONDAY, calendar.SATURDAY)
+    ]
+    day_activities = list(
+        itertools.chain(*(
+            timetable.activities_on(courses, date, selected_activities)
+            for date in dates)))
+    if len(day_activities) == 0:
+        return
+    earliest_time = min(day_activities, key=lambda act: act[1].start)[1].start
+    latest_time = max(day_activities, key=lambda act: act[1].end)[1].end
+    earliest_time = earliest_time.replace(minute=0, second=0)
+    if latest_time.minute + latest_time.second > 0:
+        latest_time = (latest_time + timedelta(hours=1)).replace(
+            minute=0, second=0)
+    rendered_activities = defaultdict(list)
+    for course, activity in day_activities:
+        hours = activity.end.hour - activity.start.hour
+        for hour in range(hours):
+            dt = date.replace(hour=activity.start.hour, minute=0, second=0)
+            rendered_activities[(activity.day,
+                                 (dt + timedelta(hours=hour)).time()
+                                 )].append(f'{course.title} {activity.name}')
+    rendered_timetable = [[''] + calendar.day_name[:5]]
+
+    hours = latest_time.hour - earliest_time.hour
+    for hour in range(hours):
+        e_dt = date.replace(hour=earliest_time.hour, minute=0, second=0)
+        dt = (e_dt + timedelta(hours=hour)).time()
+        row = [dt.strftime('%H:%M')]
+        for day in range(len(calendar.day_name) - 2):
+            row.append('\n'.join(rendered_activities[(day, dt)]))
+        rendered_timetable.append(row)
+
+    canvas = Canvas()
+    draw.table(canvas, 0, 0, rendered_timetable)
+    print(canvas.frame())
+
+
+@command('week')
+def show_week(config_dict, courses, selected_activities, args):
+    date = args['--on'] or datetime.now()
+    print(f'Showing timetable for {date:week %U of %Y}')
+    print_week_timetable(config_dict, date, courses, selected_activities)
 
 
 @command('show')
